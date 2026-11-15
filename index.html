@@ -6,6 +6,8 @@
 <title>어느 나라일까</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 /* 여권 스탬프 콘셉트: 스트리트뷰 위에 떠 있는 입국 심사 카드 + 직접 그린 세계지도 */
 :root{
@@ -73,6 +75,9 @@ select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:8px;
 .spacer{flex:1}
 .mapwrap{position:relative;height:260px;border-radius:8px;overflow:hidden;background:var(--sea);touch-action:none}
 .panel.big .mapwrap{height:min(62vh,560px)}
+/* 랜드마크 모드: 실제 지도에 핀 꽂기 */
+#lmap{position:absolute;inset:0;z-index:0;background:var(--sea);font-family:var(--body)}
+#lmap .leaflet-control-attribution{font-size:9px}
 #map{width:100%;height:100%;display:block;cursor:grab;user-select:none}
 #map.drag{cursor:grabbing}
 #map .c{fill:var(--land);stroke:var(--border);vector-effect:non-scaling-stroke;stroke-width:.6;cursor:pointer}
@@ -127,7 +132,7 @@ select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:8px;
     <p class="small" id="fileWarn" hidden style="color:var(--stamp);margin-top:12px">
       파일을 직접 열어서 스트리트뷰가 검은 화면으로 나올 거예요. 구글은 인터넷 주소(https://…)로 열린 페이지에서만 스트리트뷰를 보여줍니다. 이 파일을 웹에 올린 뒤 그 주소로 열어 주세요.
     </p>
-    <p class="small" style="margin-top:14px">정답 10점, 대륙 힌트를 쓰고 맞히면 5점, 틀렸지만 같은 대륙이면 2점. 중국·러시아·미국·호주·브라질은 북·서·남·동·중부 중 지역까지 골라야 하고, 나라만 맞으면 5점.</p>
+    <p class="small" style="margin-top:14px">랜드마크 모드는 지도에 핀을 꽂아 실제 위치에 가까울수록 높은 점수(문제당 최대 100점, 대륙 힌트를 쓰면 절반). 다른 모드는 정답 10점, 대륙 힌트를 쓰고 맞히면 5점, 틀렸지만 같은 대륙이면 2점. 중국·러시아·미국·호주·브라질은 북·서·남·동·중부 중 지역까지 골라야 하고, 나라만 맞으면 5점.</p>
   </div>
 </section>
 
@@ -141,7 +146,7 @@ select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:8px;
   </div>
   <div class="panel" id="panel">
     <div class="phead">
-      <b>어느 나라일까요?</b>
+      <b id="qText">어느 나라일까요?</b>
       <button class="tool hint" id="hintBtn">힌트: 대륙</button>
       <span class="spacer"></span>
       <button class="tool" id="labelBtn">이름 보기</button>
@@ -149,10 +154,11 @@ select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:8px;
       <button class="tool" id="quitBtn">그만하기</button>
     </div>
     <div class="mapwrap">
+      <div id="lmap" hidden></div>
       <svg id="map" xmlns="http://www.w3.org/2000/svg">
         <g id="lands"></g><g id="outlines"></g><g id="dots"></g><g id="names"></g><g id="pins"></g>
       </svg>
-      <div class="zoom"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button><button id="zreset" aria-label="전체 보기">⟲</button></div>
+      <div class="zoom" id="zoomBox"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button><button id="zreset" aria-label="전체 보기">⟲</button></div>
     </div>
     <div class="pick" id="pickRow">
       <div class="sel" id="sel"><span>지도에서 나라를 클릭하세요</span></div>
@@ -245,6 +251,8 @@ const LANDMARKS = [
   ["피사의 사탑","ITA","유럽",43.722769,10.395966,21,5],
   ["루브르 박물관","FRA","유럽",48.861172,2.335041,139,0],
   ["에펠탑","FRA","유럽",48.862105,2.288506,140,-5,"9nsA43rMuc99kH5Yg3xwcA"],
+  ["러시모어산","USA","북아메리카",43.877141,-103.4562,298,3],
+  ["기요미즈데라","JPN","아시아",34.99524,135.783891,165,-26,"rPt8yxSlBxYhPCSeJ7Heig"],
   ["머라이언 공원", "SGP", "아시아", 1.286881, 103.85442, 127, -10, "YhBmZLqsoLQFoDJgfV1QjA"],
   ["스페인 광장 (바르셀로나)", "ESP", "유럽", 41.374567, 2.149425, 326, -14, "NntC-F6nyl0WYOL3Ck82kQ"],
   ["사그라다 파밀리아", "ESP", "유럽", 41.403024, 2.173634, 38, -32],
@@ -538,7 +546,7 @@ const toPlaces=list=>list.map(([name,a3,lat,lng,h,p,pano])=>{
 const regionTag=a3=>COUNTRY[a3]?.parent!==a3?` <span class="small">(${nameOf(a3)})</span>`:"";
 
 const MODES={
-  landmark:{en:"LANDMARK MODE",ko:"랜드마크",seal:"랜",desc:"에펠탑, 경복궁처럼 유명한 건축물 앞에서 시작해요.",list:LANDMARKS,
+  landmark:{en:"LANDMARK MODE",ko:"랜드마크",seal:"랜",desc:"에펠탑, 경복궁 같은 건축물 앞에서 시작해요. 지도에 정확한 위치를 핀으로 꽂아요.",list:LANDMARKS,
     reveal:p=>`<b>${p.name}</b> · ${p.ans.map(nameOf).join(" / ")}`},
   capital:{en:"CAPITAL MODE",ko:"수도",seal:"수",desc:"세계 각국 수도의 시내 한복판. 간판과 거리 분위기로 맞혀요.",list:toPlaces(CAPITALS),
     reveal:p=>`<b>${countryName(p.a3)}</b>의 수도 <b>${p.name}</b>${regionTag(p.a3)}`},
@@ -666,7 +674,65 @@ function clearMarks(){ for(const el of svg.querySelectorAll(".sel,.right,.wrong"
 let queue=[], round=0, total=10, score=0, usedHint=false, log=[], picked=null, answered=false, current=null;
 
 function show(id){ for(const s of ["start","game","end"]) $(s).hidden = s!==id; }
-function setLabels(on){ $("names").style.display=on?"":"none"; $("labelBtn").textContent=on?"이름 숨기기":"이름 보기"; }
+let labelsOn=false;
+function setLabels(on){
+  labelsOn=on;
+  $("names").style.display=on?"":"none"; $("labelBtn").textContent=on?"이름 숨기기":"이름 보기";
+  if(pinMode) setTiles(on);
+}
+
+// ── 랜드마크 모드: 실제 지도(OpenStreetMap·CARTO)에 핀을 꽂고 거리로 점수 ──
+let pinMode=false, lmap=null, tiles=null, guess=null, guessMk=null, trueMk=null, line=null;
+const TILE_URL={on:"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+               off:"https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"};
+function initLmap(){
+  if(lmap) return;
+  lmap=L.map("lmap",{worldCopyJump:true,minZoom:1,maxZoom:18}).setView([25,10],1);
+  lmap.on("click",e=>{ if(!answered){ const ll=e.latlng.wrap(); pinGuess(ll.lat,ll.lng); } });
+}
+function setTiles(on){
+  if(!lmap) return;
+  if(tiles) lmap.removeLayer(tiles);
+  tiles=L.tileLayer(on?TILE_URL.on:TILE_URL.off,{subdomains:"abcd",maxZoom:19,
+    attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank">CARTO</a>'}).addTo(lmap);
+}
+const dot=(ll,fill)=>L.circleMarker(ll,{radius:8,color:"#fff",weight:2,fillColor:fill,fillOpacity:1,interactive:false});
+function pinGuess(lat,lng){
+  guess=[lat,lng];
+  if(guessMk) guessMk.setLatLng(guess); else guessMk=dot(guess,"#14213d").addTo(lmap);
+  $("sel").innerHTML="<span>핀을 꽂았어요.</span> 옮기려면 다시 클릭";
+  $("confirm").disabled=false;
+}
+function clearPins(){ for(const m of [guessMk,trueMk,line]) if(m) lmap.removeLayer(m); guessMk=trueMk=line=null; guess=null; }
+function distKm([a,b],[c,d]){
+  const r=Math.PI/180, x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;
+  return 12742*Math.asin(Math.sqrt(x));
+}
+const fmtKm=d=>d<1?`${Math.round(d*1000)} m`:d<100?`${d.toFixed(1)} km`:`${Math.round(d).toLocaleString()} km`;
+function setPinMode(on){
+  pinMode=on;
+  $("lmap").hidden=!on; $("map").style.display=on?"none":""; $("zoomBox").hidden=on;
+  $("qText").textContent=on?"여기는 어디일까요?":"어느 나라일까요?";
+  $("confirm").textContent=on?"이 위치로 결정":"이 나라로 결정";
+  if(on){ initLmap(); setTiles(labelsOn); requestAnimationFrame(()=>lmap.invalidateSize()); }
+}
+function answerPin(){
+  answered=true;
+  const truth=[current.lat,current.lng], d=distKm(guess,truth);
+  let pts=Math.round(100*Math.exp(-d/1500));   // 0 km=100점, 500 km≈72점, 1,500 km≈37점
+  if(usedHint) pts=Math.round(pts/2);
+  score+=pts;
+  trueMk=dot(truth,"#1f7a4d").addTo(lmap);
+  line=L.polyline([guess,truth],{color:"#c8102e",weight:2,dashArray:"6 6",interactive:false}).addTo(lmap);
+  lmap.fitBounds(L.latLngBounds([guess,truth]).pad(0.35),{maxZoom:14});
+  $("stamp").className="stamp "+(pts>=80?"ok":pts>0?"part":"no");
+  $("stamp").textContent=`+${pts}`;
+  $("answerText").innerHTML=MODES[mode].reveal(current)+`<br><span class="small">내 핀과 거리 ${fmtKm(d)}</span>`;
+  $("next").textContent = round+1>=queue.length ? "결과 보기" : "다음";
+  $("pickRow").hidden=true; $("reveal").hidden=false;
+  $("scoreVal").textContent=score;
+  log.push({lm:current,pick:null,ok:pts>=80,pts,dist:d});
+}
 
 function renderModes(){
   $("modes").innerHTML=Object.entries(MODES).map(([k,m])=>
@@ -686,13 +752,13 @@ if(!/^https?:$/.test(location.protocol) || location.origin==="null") $("fileWarn
 $("again").onclick=newGame;
 $("home").onclick=()=>show("start");
 $("next").onclick=nextRound;
-$("confirm").onclick=()=>{ if(picked&&!answered) answer() };
+$("confirm").onclick=()=>{ if(answered) return; if(pinMode){ if(guess) answerPin(); } else if(picked) answer(); };
 $("hintBtn").onclick=()=>{ if(usedHint||answered) return; usedHint=true; $("hintBtn").textContent="대륙: "+current.continent };
-$("labelBtn").onclick=()=>setLabels($("names").style.display==="none");
+$("labelBtn").onclick=()=>setLabels(!labelsOn);
 $("sizeBtn").onclick=()=>{
   const big=$("panel").classList.toggle("big");
   $("sizeBtn").textContent=big?"지도 작게":"지도 크게";
-  requestAnimationFrame(()=>setView(view));
+  requestAnimationFrame(()=>{ setView(view); if(lmap) lmap.invalidateSize(); });
 };
 $("sv").addEventListener("load",()=>{ setTimeout(()=>$("loading").hidden=true,600) });
 
@@ -713,6 +779,8 @@ function newGame(){
   total=+$("rounds").value; score=0; round=-1; log=[];
   queue=shuffle(MODES[mode].list).slice(0,total);
   show("game");
+  // 지도 라이브러리를 못 불러오면 랜드마크도 나라 고르기로 진행
+  setPinMode(mode==="landmark" && !!window.L);
   setLabels($("labels").value==="on");
   setView(WORLD_BOX);
   nextRound();
@@ -724,8 +792,9 @@ function nextRound(){
   current=queue[round];
   picked=null; answered=false; usedHint=false;
   clearMarks(); setView(WORLD_BOX);
+  if(pinMode){ clearPins(); lmap.setView([25,10],1); }
   $("hintBtn").textContent="힌트: 대륙";
-  $("sel").innerHTML="<span>지도에서 나라를 클릭하세요</span>";
+  $("sel").innerHTML=pinMode?"<span>지도를 확대해서 정확한 위치에 핀을 꽂으세요</span>":"<span>지도에서 나라를 클릭하세요</span>";
   $("confirm").disabled=true;
   $("pickRow").hidden=false; $("reveal").hidden=true;
   $("roundVal").textContent=`${round+1}/${queue.length}`;
@@ -775,6 +844,12 @@ function finish(){
   show("end");
   $("sv").src="about:blank";
   $("final").textContent=`${score}점`;
+  if(pinMode){
+    const avg=log.length?log.reduce((s,x)=>s+x.dist,0)/log.length:0;
+    $("finalSub").textContent=`${MODES[mode].ko} 모드 · ${log.length}문제 · 평균 거리 ${fmtKm(avg)} · 만점 ${log.length*100}점`;
+    $("review").innerHTML=log.map(x=>`<li><span>${x.lm.name}</span><span>${fmtKm(x.dist)} · <b>${x.pts}점</b></span></li>`).join("");
+    return;
+  }
   $("finalSub").textContent=`${MODES[mode].ko} 모드 · ${log.length}문제 중 ${log.filter(x=>x.ok).length}개 정답 · 만점 ${log.length*10}점`;
   $("review").innerHTML=log.map(x=>`<li><span>${x.ok?"✔":"✘"} ${x.lm.name}</span><span>${nameOf(x.lm.a3)}${x.ok?"":` <span class="small">(고른 답: ${nameOf(x.pick)})</span>`}</span></li>`).join("");
 }
