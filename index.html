@@ -205,7 +205,7 @@ function regionOf(a3,lat,lng){
 }
 const toCode=(a3,lat,lng)=>SPLIT[a3]?`${a3}-${regionOf(a3,lat,lng)}`:a3;
 
-// 랜드마크: 이름, 나라 코드(ISO 3자리, 여러 나라에 걸치면 배열), 대륙, 위도, 경도, 방향(도), 상하각(음수=위)
+// 랜드마크: 이름, 나라 코드(ISO 3자리, 여러 나라에 걸치면 배열), 대륙, 위도, 경도, 방향(도), 상하각(음수=위), (사진 ID), (정답 핀 위치 [위도, 경도])
 // 구글 어스/스트리트뷰 링크의 @위도,경도,…,방향h,기울기t 에서 뽑은 값. 상하각 = 90 - 기울기
 // 한국처럼 링크에 좌표가 없는 곳은 마지막에 스트리트뷰 사진 ID를 넣습니다 (위도·경도는 정답 핀 위치용).
 const LANDMARKS = [
@@ -237,7 +237,7 @@ const LANDMARKS = [
   ["도쿄역","JPN","아시아",35.681667,139.764722,166,-9],
   ["도쿄타워","JPN","아시아",35.659019,139.745690,233,-67],
   ["평양 시내","PRK","아시아",39.040362,125.739604,330,5],
-  ["만리장성","CHN","아시아",40.432009,116.564326,180,5],
+  ["만리장성","CHN","아시아",40.432009,116.564326,180,5,null,[40.416432,116.537895]],   // 정답 핀은 무톈위 매표소
   ["상하이 타워","CHN","아시아",31.234916,121.500118,307,-70],
   ["타지마할","IND","아시아",27.171889,78.042144,2,-13],
   ["에베레스트 베이스캠프","NPL","아시아",28.002586,86.852760,140,-21],
@@ -298,9 +298,9 @@ const LANDMARKS = [
   ["헝가리 국회의사당","HUN","유럽",47.506943,19.047482,266,-18,"YqwtdGDa9E4_bDtVtQMkKQ"],
   ["히메지성","JPN","아시아",34.838829,134.693741,17,-22],
   ["체르노빌 원자력 발전소","UKR","유럽",51.389250,30.099034,343,-3],
-].map(([name,a3,continent,lat,lng,h,p,pano])=>{
+].map(([name,a3,continent,lat,lng,h,p,pano,target])=>{
   const ans=[].concat(a3).map(a=>toCode(a,lat,lng));
-  return {name,ans,a3:ans[0],continent,lat,lng,h,p,pano};
+  return {name,ans,a3:ans[0],continent,lat,lng,h,p,pano,target};   // target: 정답 핀 위치(없으면 스트리트뷰 위치)
 });
 
 // ── 나라 데이터 ──
@@ -738,7 +738,7 @@ function setPinMode(on){
 }
 function answerPin(){
   answered=true;
-  const truth=[current.lat,current.lng], d=distKm(guess,truth);
+  const truth=current.target||[current.lat,current.lng], d=distKm(guess,truth);
   let pts=Math.round(100*Math.exp(-d/1500));   // 0 km=100점, 500 km≈72점, 1,500 km≈37점
   if(usedHint) pts=Math.round(pts/2);
   score+=pts;
