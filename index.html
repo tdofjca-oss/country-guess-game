@@ -683,8 +683,12 @@ function setLabels(on){
 
 // ── 랜드마크 모드: 실제 지도(OpenStreetMap·CARTO)에 핀을 꽂고 거리로 점수 ──
 let pinMode=false, lmap=null, tiles=null, guess=null, guessMk=null, trueMk=null, line=null;
-const TILE_URL={on:"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-               off:"https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"};
+// 이름 보기 = OpenStreetMap 일반 지도, 이름 숨기기 = 이름 없는 위성 사진(Esri). 둘 다 키 없이 사용
+const TILES={
+  on:["https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,
+      attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> 기여자'}],
+  off:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:18,
+      attribution:'위성 사진 © Esri, Maxar, Earthstar Geographics'}]};
 function initLmap(){
   if(lmap) return;
   lmap=L.map("lmap",{worldCopyJump:true,minZoom:1,maxZoom:18}).setView([25,10],1);
@@ -693,8 +697,8 @@ function initLmap(){
 function setTiles(on){
   if(!lmap) return;
   if(tiles) lmap.removeLayer(tiles);
-  tiles=L.tileLayer(on?TILE_URL.on:TILE_URL.off,{subdomains:"abcd",maxZoom:19,
-    attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank">CARTO</a>'}).addTo(lmap);
+  const [url,opt]=on?TILES.on:TILES.off;
+  tiles=L.tileLayer(url,opt).addTo(lmap);
 }
 const dot=(ll,fill)=>L.circleMarker(ll,{radius:8,color:"#fff",weight:2,fillColor:fill,fillOpacity:1,interactive:false});
 function pinGuess(lat,lng){
