@@ -699,10 +699,10 @@ function setLabels(on){
 
 // ── 랜드마크 모드: 실제 지도(OpenStreetMap·CARTO)에 핀을 꽂고 거리로 점수 ──
 let pinMode=false, lmap=null, tiles=null, guess=null, guessMk=null, trueMk=null, line=null;
-// 이름 보기 = OpenStreetMap 일반 지도, 이름 숨기기 = 이름 없는 위성 사진(Esri). 둘 다 키 없이 사용
+// 이름 보기 = 영어 표기 일반 지도(Esri World Street Map), 이름 숨기기 = 이름 없는 위성 사진(Esri). 둘 다 키 없이 사용
 const TILES={
-  on:["https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,
-      attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> 기여자'}],
+  on:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,
+      attribution:"지도 © Esri, HERE, Garmin, OpenStreetMap 기여자"}],
   off:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:18,
       attribution:'위성 사진 © Esri, Maxar, Earthstar Geographics'}]};
 function initLmap(){
